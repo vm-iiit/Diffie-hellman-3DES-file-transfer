@@ -90,23 +90,16 @@ void DH_auth(int fd)
 	AutoSeededRandomPool rnd1;
 	PrimeAndGenerator pg1;
 	pg1.Generate(1, rnd1, 64, 63);
-	CryptoPP::Integer p1 = pg1.Prime();
-    CryptoPP::Integer q1= pg1.SubPrime();
-    CryptoPP::Integer g1 = pg1.Generator();
+	Integer p1 = pg1.Prime();
+    Integer q1= pg1.SubPrime();
+    Integer g1 = pg1.Generator();
 
-	std::cout << "P1: " << p1 << '\n';
-	std::cout << "Q1: " << q1 << '\n';
-	std::cout << "G1: " << g1 << '\n';
-
-	//sending p
+	cout << "P1: " << p1 << '\n';
+	cout << "Q1: " << q1 << '\n';
+	cout << "G1: " << g1 << '\n';
 	send_Integer(p1, fd);
-
-	//sending g
 	send_Integer(g1, fd);
-
 	DH dhC1 = CryptoPP::DH(p1, q1, g1);
-	
-
 	SecByteBlock privKeyC1, pubKeyC1;
 	privKeyC1 = SecByteBlock(dhC1.PrivateKeyLength());
     pubKeyC1 = SecByteBlock(dhC1.PublicKeyLength());
@@ -123,8 +116,74 @@ void DH_auth(int fd)
     cout<<"shared key "<<shared_key1<<endl;
 
     SecByteBlock Key1 = Int2Block(shared_key1);
-    char enkey[sizeof(Key1)];
-    memcpy(enkey, Key1, sizeof(Key1));
+    char enkey1[sizeof(Key1)];
+    memcpy(enkey1, Key1, sizeof(Key1));
+
+
+    AutoSeededRandomPool rnd2;
+	PrimeAndGenerator pg2;
+	pg2.Generate(1, rnd2, 64, 63);
+	Integer p2 = pg2.Prime();
+    Integer q2= pg2.SubPrime();
+    Integer g2 = pg2.Generator();
+
+	cout << "P2: " << p2 << '\n';
+	cout << "Q2: " << q2 << '\n';
+	cout << "G2: " << g2 << '\n';
+	send_Integer(p2, fd);
+	send_Integer(g2, fd);
+	DH dhC2 = DH(p2, q2, g2);
+	SecByteBlock privKeyC2, pubKeyC2;
+	privKeyC2 = SecByteBlock(dhC2.PrivateKeyLength());
+    pubKeyC2 = SecByteBlock(dhC2.PublicKeyLength());
+    dhC2.GenerateKeyPair(rnd2, privKeyC2, pubKeyC2);
+
+    Integer pubk2(pubKeyC2, pubKeyC2.size());
+    Integer privk2(privKeyC2, privKeyC2.size());
+    cout<<"pubkey "<<pubk2<<endl;
+    cout<<"privkey "<<privk2<<endl;
+    send_Integer(pubk2, fd);
+
+    Integer pubkeyS2 = receive_Integer(fd);
+    Integer shared_key2 = ModularExponentiation(pubkeyS2, privk2, p2);
+    cout<<"shared key "<<shared_key2<<endl;
+
+    SecByteBlock Key2 = Int2Block(shared_key2);
+    char enkey2[sizeof(Key2)];
+    memcpy(enkey2, Key2, sizeof(Key2));
+
+
+    AutoSeededRandomPool rnd3;
+	PrimeAndGenerator pg3;
+	pg3.Generate(1, rnd1, 64, 63);
+	Integer p3 = pg3.Prime();
+    Integer q3= pg3.SubPrime();
+    Integer g3 = pg3.Generator();
+
+	cout << "P3  " << p3 << '\n';
+	cout << "Q3: " << q3 << '\n';
+	cout << "G3: " << g3 << '\n';
+	send_Integer(p3, fd);
+	send_Integer(g3, fd);
+	DH dhC3 = CryptoPP::DH(p3, q3, g3);
+	SecByteBlock privKeyC3, pubKeyC3;
+	privKeyC3 = SecByteBlock(dhC3.PrivateKeyLength());
+    pubKeyC3 = SecByteBlock(dhC3.PublicKeyLength());
+    dhC3.GenerateKeyPair(rnd3, privKeyC3, pubKeyC3);
+
+    Integer pubk3(pubKeyC3, pubKeyC3.size());
+    Integer privk3(privKeyC3, privKeyC3.size());
+    cout<<"pubkey "<<pubk3<<endl;
+    cout<<"privkey "<<privk3<<endl;
+    send_Integer(pubk3, fd);
+
+    Integer pubkeyS3 = receive_Integer(fd);
+    Integer shared_key3 = ModularExponentiation(pubkeyS3, privk3, p3);
+    cout<<"shared key "<<shared_key3<<endl;
+
+    SecByteBlock Key3 = Int2Block(shared_key3);
+    char enkey3[sizeof(Key3)];
+    memcpy(enkey3, Key3, sizeof(Key3));
 
     byte block[1024];
     char buffer[1024];
@@ -140,7 +199,9 @@ void DH_auth(int fd)
 	while(( n = recv(fd, block, 1024, 0)) > 0)
 	{	
 		// cout<<"encrypted text :"<<block<<endl;
-		DES_Process(enkey, block, 1024, CryptoPP::DECRYPTION);
+		DES_Process(enkey3, block, 1024, CryptoPP::DECRYPTION);
+		DES_Process(enkey2, block, 1024, CryptoPP::ENCRYPTION);
+		DES_Process(enkey1, block, 1024, CryptoPP::DECRYPTION);
 		// cout<<"decrypted text :\n";
 		// cout<<block<<endl;
 		memset(buffer, '\0', 1024);

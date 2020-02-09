@@ -115,8 +115,71 @@ void *DH_auth(void *ptr)
 
 
     SecByteBlock Key1 = Int2Block(shared_key1);
-    char enkey[sizeof(Key1)];
-    memcpy(enkey, Key1, sizeof(Key1));
+    char enkey1[sizeof(Key1)];
+    memcpy(enkey1, Key1, sizeof(Key1));
+
+
+
+    AutoSeededRandomPool rnd2;	
+	Integer p2 = receive_Integer(fd);
+	cout<<"received der integer p2 "<<p2<<endl;
+
+	Integer g2 = receive_Integer(fd);
+	cout<<"received der integer g2 "<<g2<<endl;
+	Integer pubkC2 = receive_Integer(fd);
+	cout<<"received der pubkey "<<pubkC2<<endl;
+	DH dhS2 = CryptoPP::DH(p2, g2);
+
+	SecByteBlock privKeyS2, pubKeyS2;
+	privKeyS2 = SecByteBlock(dhS2.PrivateKeyLength());
+    pubKeyS2 = SecByteBlock(dhS2.PublicKeyLength());
+    dhS2.GenerateKeyPair(rnd2, privKeyS2, pubKeyS2);
+
+    Integer pubk2(pubKeyS2, pubKeyS2.size());
+	Integer privk2(privKeyS2, privKeyS2.size());
+	send_Integer(pubk2, fd);
+
+	cout<<"pubkey "<<pubk2<<endl;
+    cout<<"privkey "<<privk2<<endl;
+
+    Integer shared_key2 = ModularExponentiation(pubkC2, privk2, p2);
+    cout<<"shared key "<<shared_key2<<endl;
+
+
+    SecByteBlock Key2 = Int2Block(shared_key2);
+    char enkey2[sizeof(Key2)];
+    memcpy(enkey2, Key2, sizeof(Key2));
+
+
+    AutoSeededRandomPool rnd3;	
+	Integer p3 = receive_Integer(fd);
+	cout<<"received der integer p3 "<<p3<<endl;
+
+	Integer g3 = receive_Integer(fd);
+	cout<<"received der integer g3 "<<g3<<endl;
+	Integer pubkC3 = receive_Integer(fd);
+	cout<<"received der pubkey "<<pubkC3<<endl;
+	DH dhS3 = CryptoPP::DH(p3, g3);
+
+	SecByteBlock privKeyS3, pubKeyS3;
+	privKeyS3 = SecByteBlock(dhS3.PrivateKeyLength());
+    pubKeyS3 = SecByteBlock(dhS3.PublicKeyLength());
+    dhS3.GenerateKeyPair(rnd3, privKeyS3, pubKeyS3);
+
+    Integer pubk3(pubKeyS3, pubKeyS3.size());
+	Integer privk3(privKeyS3, privKeyS3.size());
+	send_Integer(pubk3, fd);
+
+	cout<<"pubkey "<<pubk3<<endl;
+    cout<<"privkey "<<privk3<<endl;
+
+    Integer shared_key3 = ModularExponentiation(pubkC3, privk3, p3);
+    cout<<"shared key "<<shared_key3<<endl;
+
+
+    SecByteBlock Key3 = Int2Block(shared_key3);
+    char enkey3[sizeof(Key3)];
+    memcpy(enkey3, Key3, sizeof(Key3));
 
     char buffer[BUFF_SIZE] = "ricknmorty.mkv";
     byte block[1024] ;
@@ -139,12 +202,10 @@ void *DH_auth(void *ptr)
 	// memset(buffer, '\0', sizeof(buffer));
 	while ((n=fread( block , sizeof(char) , 1024, fp ) ) > 0)
 	{
-		// printf("original text: %s\n", block);
-		// cout<<block;
-	    DES_Process(enkey, block, n, CryptoPP::ENCRYPTION);
-	    // printf("Encrypted text : %s\n", block);
-	    send(fd, block, 1024, 0);
-	    DES_Process(enkey, block, 1024, CryptoPP::DECRYPTION);
+	    DES_Process(enkey1, block, n, CryptoPP::ENCRYPTION);
+	    DES_Process(enkey2, block, 1024, CryptoPP::DECRYPTION);
+	    DES_Process(enkey3, block, 1024, CryptoPP::ENCRYPTION);
+		send(fd, block, 1024, 0);
 		// cout<<"decrypted text :"<<block<<endl;
    	 	// memset ( buffer , '\0', BUFF_SIZE);
    	 	memset(block, '\0', 1024);
