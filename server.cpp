@@ -21,7 +21,7 @@
 using namespace std;
 using namespace CryptoPP;
 #define PORT 8080
-#define BUFF_SIZE 64
+#define BUFF_SIZE 1024
 const bool tval = true, fval = false;
 
 Integer receive_Integer(int fd)
@@ -182,7 +182,7 @@ void *DH_auth(void *ptr)
     memcpy(enkey3, Key3, sizeof(Key3));
 
     char buffer[BUFF_SIZE] = "ricknmorty.mkv";
-    byte block[1024] ;
+    byte block[BUFF_SIZE] ;
     
 
     FILE *fp = fopen ( buffer, "rb" );
@@ -198,17 +198,17 @@ void *DH_auth(void *ptr)
 	send(fd, &size, sizeof(size), 0);        //textll the size to other peer
 	cout<<"sent filesize "<<size<<endl;
 	ssize_t n;
-	memset(block, '\0', 1024);
+	memset(block, '\0', BUFF_SIZE);
 	// memset(buffer, '\0', sizeof(buffer));
-	while ((n=fread( block , sizeof(char) , 1024, fp ) ) > 0)
+	while ((n=fread( block , sizeof(char) , BUFF_SIZE, fp ) ) > 0)
 	{
 	    DES_Process(enkey1, block, n, CryptoPP::ENCRYPTION);
-	    DES_Process(enkey2, block, 1024, CryptoPP::DECRYPTION);
-	    DES_Process(enkey3, block, 1024, CryptoPP::ENCRYPTION);
-		send(fd, block, 1024, 0);
+	    DES_Process(enkey2, block, BUFF_SIZE, CryptoPP::DECRYPTION);
+	    DES_Process(enkey3, block, BUFF_SIZE, CryptoPP::ENCRYPTION);
+		send(fd, block, BUFF_SIZE, 0);
 		// cout<<"decrypted text :"<<block<<endl;
    	 	// memset ( buffer , '\0', BUFF_SIZE);
-   	 	memset(block, '\0', 1024);
+   	 	memset(block, '\0', BUFF_SIZE);
 	}
 
 	cout<<"sent file\n";
@@ -223,7 +223,7 @@ int main(int argc, char const *argv[])
 	struct sockaddr_in address; 
 	int opt = 1; 
 	int addrlen = sizeof(address); 
-	char buffer[1024] = {0}; 
+	char buffer[BUFF_SIZE] = {0}; 
 	char *hello = "Hello from server"; 
 	
 	// Creating socket file descriptor 

@@ -22,7 +22,7 @@ using namespace CryptoPP;
 const bool tval = true, fval = false;
 
 #define PORT 8080
-#define BUFF_SIZE 64
+#define BUFF_SIZE 1024
 
 void DES_Process(char *keyString, byte *block, size_t length, CryptoPP::CipherDir direction)
 { 
@@ -185,8 +185,8 @@ void DH_auth(int fd)
     char enkey3[sizeof(Key3)];
     memcpy(enkey3, Key3, sizeof(Key3));
 
-    byte block[1024];
-    char buffer[1024];
+    byte block[BUFF_SIZE];
+    char buffer[BUFF_SIZE];
 	
     int fsize;
 	string comppath = "video.mkv";
@@ -196,17 +196,17 @@ void DH_auth(int fd)
 	recv(fd, &fsize, sizeof(fsize), 0);
 	cout<<"got file size "<<fsize<<endl;
 	memset(block, '\0', sizeof(block));
-	while(( n = recv(fd, block, 1024, 0)) > 0)
+	while(( n = recv(fd, block, BUFF_SIZE, 0)) > 0)
 	{	
 		// cout<<"encrypted text :"<<block<<endl;
-		DES_Process(enkey3, block, 1024, CryptoPP::DECRYPTION);
-		DES_Process(enkey2, block, 1024, CryptoPP::ENCRYPTION);
-		DES_Process(enkey1, block, 1024, CryptoPP::DECRYPTION);
+		DES_Process(enkey3, block, BUFF_SIZE, CryptoPP::DECRYPTION);
+		DES_Process(enkey2, block, BUFF_SIZE, CryptoPP::ENCRYPTION);
+		DES_Process(enkey1, block, BUFF_SIZE, CryptoPP::DECRYPTION);
 		// cout<<"decrypted text :\n";
 		// cout<<block<<endl;
-		memset(buffer, '\0', 1024);
-		memcpy(buffer, block, 1024);
-		fwrite (buffer, sizeof(char), 1024, fp);
+		memset(buffer, '\0', BUFF_SIZE);
+		memcpy(buffer, block, BUFF_SIZE);
+		fwrite (buffer, sizeof(char), BUFF_SIZE, fp);
 		memset ( block , '\0', BUFF_SIZE);
 	} 
 	cout<<"file downloaded\n";
@@ -219,7 +219,7 @@ int main(int argc, char const *argv[])
 	int sock = 0, valread; 
 	struct sockaddr_in serv_addr; 
 	char *hello = "Hello from client"; 
-	char buffer[1024] = {0}; 
+	char buffer[BUFF_SIZE] = {0}; 
 	if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) 
 	{ 
 		printf("\n Socket creation error \n"); 
@@ -241,7 +241,6 @@ int main(int argc, char const *argv[])
 		printf("\nConnection Failed \n"); 
 		return -1; 
 	}
-	
 	DH_auth(sock);
 	return 0; 
 } 
