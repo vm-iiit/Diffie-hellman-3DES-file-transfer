@@ -21,6 +21,7 @@
 using namespace std;
 using namespace CryptoPP;
 #define PORT 8080
+#define BUFF_SIZE 64
 const bool tval = true, fval = false;
 
 Integer receive_Integer(int fd)
@@ -52,10 +53,8 @@ void send_Integer(Integer &I, int fd)
 	}
 }
 
-void DES_Process(SecByteBlock *keyString, byte *block, size_t length, CryptoPP::CipherDir direction)
+void DES_Process(char *keyString, byte *block, size_t length, CryptoPP::CipherDir direction)
 { 
-	cout<<"standard "<<DES_EDE2::KEYLENGTH<<endl;
-	cout<<"obtained "<<sizeof(keyString)<<endl;
     byte key[DES_EDE2::KEYLENGTH];
     memcpy(key, keyString, DES_EDE2::KEYLENGTH);
     BlockTransformation *t = NULL;
@@ -76,11 +75,13 @@ void DES_Process(SecByteBlock *keyString, byte *block, size_t length, CryptoPP::
     delete t;
 }
 
-void Int2Block(const Integer& x, SecByteBlock& bytes)
+SecByteBlock Int2Block(Integer x)
 {
+	SecByteBlock bytes;
     size_t encodedSize = x.MinEncodedSize(Integer::UNSIGNED);
     bytes.resize(encodedSize);
     x.Encode(bytes.BytePtr(), encodedSize, Integer::UNSIGNED);
+    return bytes;
 }
 
 void *DH_auth(void *ptr)
@@ -113,16 +114,46 @@ void *DH_auth(void *ptr)
     cout<<"shared key "<<shared_key1<<endl;
 
 
-    SecByteBlock Key1;
-    Int2Block(shared_key1, Key1);
+    SecByteBlock Key1 = Int2Block(shared_key1);
+    char enkey[sizeof(Key1)];
+    memcpy(enkey, Key1, sizeof(Key1));
 
-	byte block[1024];
-	memset(block, '\0', sizeof(block));
-	read(fd, block, sizeof(block));
-	DES_Process(&Key1, block, sizeof(block), CryptoPP::DECRYPTION);
+    char buffer[BUFF_SIZE] = "ricknmorty.mkv";
+    byte block[1024] ;
+    
 
-    printf("Decrypt: %s\n", block);
-	
+    FILE *fp = fopen ( buffer, "rb" );
+	if(fp==NULL)
+	{
+		cout<<"cant open file\n";
+		pthread_exit(NULL);
+	}
+	fseek(fp, 0, SEEK_END);
+	int size = ftell(fp);                       //calculate filesize
+	rewind(fp);
+	cout<<"size of file is "<<size<<endl;
+	send(fd, &size, sizeof(size), 0);        //textll the size to other peer
+	cout<<"sent filesize "<<size<<endl;
+	ssize_t n;
+	memset(block, '\0', 1024);
+	// memset(buffer, '\0', sizeof(buffer));
+	while ((n=fread( block , sizeof(char) , 1024, fp ) ) > 0)
+	{
+		// printf("original text: %s\n", block);
+		// cout<<block;
+	    DES_Process(enkey, block, n, CryptoPP::ENCRYPTION);
+	    // printf("Encrypted text : %s\n", block);
+	    send(fd, block, 1024, 0);
+	    DES_Process(enkey, block, 1024, CryptoPP::DECRYPTION);
+		// cout<<"decrypted text :"<<block<<endl;
+   	 	// memset ( buffer , '\0', BUFF_SIZE);
+   	 	memset(block, '\0', 1024);
+	}
+
+	cout<<"sent file\n";
+	close(fd);
+	fclose(fp);
+	pthread_exit(NULL);
 }
 
 int main(int argc, char const *argv[]) 
@@ -176,7 +207,7 @@ int main(int argc, char const *argv[])
 			perror("accept"); 
 			exit(EXIT_FAILURE); 
 		}
-		cout<<"connection accepted new fd :"<<new_socket<<endl;
+		
 		pthread_create(&threads[counter++], NULL, DH_auth, (void *)&new_socket);
 	}
 } 

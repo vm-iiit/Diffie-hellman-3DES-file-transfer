@@ -22,11 +22,10 @@ using namespace CryptoPP;
 const bool tval = true, fval = false;
 
 #define PORT 8080
+#define BUFF_SIZE 64
 
-void DES_Process(SecByteBlock *keyString, byte *block, size_t length, CryptoPP::CipherDir direction)
+void DES_Process(char *keyString, byte *block, size_t length, CryptoPP::CipherDir direction)
 { 
-	cout<<"standard "<<DES_EDE2::KEYLENGTH<<endl;
-	cout<<"obtained "<<sizeof(keyString)<<endl;
     byte key[DES_EDE2::KEYLENGTH];
     memcpy(key, keyString, DES_EDE2::KEYLENGTH);
     BlockTransformation *t = NULL;
@@ -76,18 +75,21 @@ void send_Integer(Integer &I, int fd)
 	}
 }
 
-void Int2Block(const Integer& x, SecByteBlock& bytes)
+SecByteBlock Int2Block(Integer x)
 {
+	SecByteBlock bytes;
     size_t encodedSize = x.MinEncodedSize(Integer::UNSIGNED);
     bytes.resize(encodedSize);
     x.Encode(bytes.BytePtr(), encodedSize, Integer::UNSIGNED);
+    return bytes;
 }
+
 
 void DH_auth(int fd)
 {
 	AutoSeededRandomPool rnd1;
 	PrimeAndGenerator pg1;
-	pg1.Generate(1, rnd1, 512, 511);
+	pg1.Generate(1, rnd1, 64, 63);
 	CryptoPP::Integer p1 = pg1.Prime();
     CryptoPP::Integer q1= pg1.SubPrime();
     CryptoPP::Integer g1 = pg1.Generator();
@@ -120,19 +122,35 @@ void DH_auth(int fd)
     Integer shared_key1 = ModularExponentiation(pubkeyS1, privk1, p1);
     cout<<"shared key "<<shared_key1<<endl;
 
-    
+    SecByteBlock Key1 = Int2Block(shared_key1);
+    char enkey[sizeof(Key1)];
+    memcpy(enkey, Key1, sizeof(Key1));
 
-    SecByteBlock Key1;
-    Int2Block(shared_key1, Key1);
-    // cout<<"shared key again"<<shared_key1<<endl;
-
-    byte block[1024] = "qwert\ny\tuiop";
-    printf("original text: %s\n", block);
-    DES_Process(&Key1, block, sizeof(block), CryptoPP::ENCRYPTION);
-
-    printf("Encrypted text : %s\n", block);
-
-    send(fd, block, sizeof(block), 0);	
+    byte block[1024];
+    char buffer[1024];
+	
+    int fsize;
+	string comppath = "video.mkv";
+	
+	FILE *fp = fopen (comppath.c_str(), "wb");
+	ssize_t n;
+	recv(fd, &fsize, sizeof(fsize), 0);
+	cout<<"got file size "<<fsize<<endl;
+	memset(block, '\0', sizeof(block));
+	while(( n = recv(fd, block, 1024, 0)) > 0)
+	{	
+		// cout<<"encrypted text :"<<block<<endl;
+		DES_Process(enkey, block, 1024, CryptoPP::DECRYPTION);
+		// cout<<"decrypted text :\n";
+		// cout<<block<<endl;
+		memset(buffer, '\0', 1024);
+		memcpy(buffer, block, 1024);
+		fwrite (buffer, sizeof(char), 1024, fp);
+		memset ( block , '\0', BUFF_SIZE);
+	} 
+	cout<<"file downloaded\n";
+    close(fd);
+	fclose(fp);
 }
 
 int main(int argc, char const *argv[]) 
