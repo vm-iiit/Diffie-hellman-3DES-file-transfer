@@ -21,7 +21,7 @@ using namespace std;
 using namespace CryptoPP;
 const bool tval = true, fval = false;
 
-#define PORT 8080
+#define PORT 9876
 #define BUFF_SIZE 1024
 const int ten=10, twenty=20, thirty=30, forty=40, fifty=50;
 bool bsync;
@@ -214,7 +214,7 @@ void Diffie_Hellman(int fd)
 
 void file_download(string filename, int fd)
 {
-	int opc;
+	int opc=0;
 	send(fd, filename.c_str(), BUFF_SIZE, 0);
     byte block[BUFF_SIZE];
     char buffer[BUFF_SIZE];
@@ -254,42 +254,23 @@ void file_download(string filename, int fd)
 	int lc=0;
 	while(fsize > 0)
 	{	
-		// send(fd, &bsync, sizeof(bsync), 0);
+		send(fd, &bsync, sizeof(bsync), 0);
 		recv(fd, &n, sizeof(n), 0);
-		recv(fd, block, n*sizeof(byte), 0);
-					
-			DES_Process(K3, block, BUFF_SIZE, CryptoPP::DECRYPTION);
-			DES_Process(K2, block, BUFF_SIZE, CryptoPP::ENCRYPTION);
-			DES_Process(K1, block, BUFF_SIZE, CryptoPP::DECRYPTION);
-			// cout<<block;
-			memset(buffer, '\0', BUFF_SIZE);
-			memcpy(buffer, block, BUFF_SIZE);
-			fwrite (buffer, sizeof(char), n, fp);
-			memset ( block , '\0', BUFF_SIZE);
-			// cout<<"\nremaining fsize "<<fsize<<endl;
-			fsize -= n;
-			cout<<"loop count "<<(++lc)<<endl;
+		recv(fd, block, n*sizeof(byte), 0);	
+		DES_Process(K3, block, BUFF_SIZE, CryptoPP::DECRYPTION);
+		DES_Process(K2, block, BUFF_SIZE, CryptoPP::ENCRYPTION);
+		DES_Process(K1, block, BUFF_SIZE, CryptoPP::DECRYPTION);
+		memset(buffer, '\0', BUFF_SIZE);
+		memcpy(buffer, block, BUFF_SIZE);
+		fwrite (buffer, sizeof(char), n, fp);
+		memset ( block , '\0', BUFF_SIZE);
+		fsize -= n;
 	}
-	
 	cout<<"file transfer complete\n";
-	fclose(fp);
-	cout<<"\nsending sync\n";
-	cout<<"\nsent sync\n";
 	recv(fd, &opc, sizeof(opc), 0);
-	cout<<"\nrecived "<<opc<<" from server\n";
-	if(opc == 40)
-	{	
-		cout<<"\ngot REQCOM from server\n";
-		cout<<"file downloaded\n";
-	}
-	else
-	{
-		cout<<"\nfile download unsuccessful, exiting\n";
-		// cout<<"sending DISCONNECT to server\n";
-		// send(fd, &fifty, sizeof(fifty), 0);
-		// close(fd);
-		// exit(0);
-	}
+	cout<<"\ngot REQCOM from server\n";
+	cout<<"file downloaded\n";
+	fclose(fp);
 }
 
 int main(int argc, char const *argv[]) 
@@ -306,13 +287,12 @@ int main(int argc, char const *argv[])
 	serv_addr.sin_family = AF_INET; 
 	serv_addr.sin_port = htons(PORT); 
 	
-	// Convert IPv4 and IPv6 addresses from text to binary form 
 	if(inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr)<=0) 
 	{ 
 		printf("\nInvalid address/ Address not supported \n"); 
 		return -1; 
 	} 
-	// int nfd;
+	
 	if ((connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr))) < 0) 
 	{ 
 		printf("\nConnection Failed \n"); 
@@ -335,15 +315,10 @@ int main(int argc, char const *argv[])
 		cout<<"sending REQSERV to server\n";
 		send(sock, &twenty, sizeof(twenty), 0);
 		file_download(filename, sock);
-		cout<<"Enter C to continue downloading more files, any other key to exit\n";
-		cin.clear();
-		fflush(stdin);
-		cin>>ch;
-		if(ch != 'C' && ch != 'c')
-			break;
+		cout<<"sending DISCONNECT to server\n";
+		send(sock, &fifty, sizeof(fifty), 0);
+		close(sock);
+		break;
 	}
-	cout<<"sending DISCONNECT to server\n";
-	send(sock, &fifty, sizeof(fifty), 0);
-	close(sock);
 	return 0; 
 } 

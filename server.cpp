@@ -21,7 +21,7 @@
 using namespace std;
 using namespace CryptoPP;
 
-#define PORT 8080
+#define PORT 9876
 #define BUFF_SIZE 1024
 const bool tval = true, fval = false;
 const int ten=10, twenty=20, thirty=30, forty=40, fifty=50, na=0;
@@ -107,7 +107,6 @@ struct enckeys{
 };
 
 typedef struct enckeys Keyset;
-// Keyset Kset;
 
 char **Diffie_Hellman(int fd)
 {
@@ -115,10 +114,10 @@ char **Diffie_Hellman(int fd)
 
 	AutoSeededRandomPool rnd1;	
 	Integer p1 = receive_Integer(fd);
-	cout<<" received Large prime 1 : " << p1 << '\n';
+	cout<<"received Large prime 1 : " << p1 << '\n';
 
 	Integer g1 = receive_Integer(fd);
-	cout << "received Primitive root 1 : " << g1 << '\n';
+	cout<<"received Primitive root 1 : " << g1 << '\n';
 	Integer pubkC1 = receive_Integer(fd);
 	cout<<"received pubkey1 from client "<<pubkC1<<endl;
 	DH dhS1 = CryptoPP::DH(p1, g1);
@@ -211,7 +210,6 @@ void send_file(char *filename, int fd, char **Karr)
 	
     char buffer[BUFF_SIZE];
     byte block[BUFF_SIZE] ;
-    cout<<"\nbuffer addressis "<<&buffer<<endl;
     
     FILE *fp = fopen(filename, "rb");
 	fseek(fp, 0, SEEK_END);
@@ -220,12 +218,11 @@ void send_file(char *filename, int fd, char **Karr)
 	rewind(fp);
 	cout<<"size of file is "<<size<<endl;
 	send(fd, &size, sizeof(size), 0);        
-	cout<<"sent filesize "<<size<<" to fd# "<<fd<<endl;
 	memset(block, '\0', BUFF_SIZE);
 	int lc=0;
 	while (size > 0)
 	{	
-		// recv(fd, &bsync, sizeof(bsync), 0);
+		recv(fd, &bsync, sizeof(bsync), 0);
 		n=fread( block , sizeof(char) , BUFF_SIZE, fp );
 		send(fd, &n, sizeof(n), 0);
 	    DES_Process(Karr[0], block, n, CryptoPP::ENCRYPTION);
@@ -234,14 +231,14 @@ void send_file(char *filename, int fd, char **Karr)
 		send(fd, block, BUFF_SIZE*sizeof(byte), 0);
    	 	memset(block, '\0', BUFF_SIZE);
    	 	size -= n;
-   	 	cout<<"loop count "<<(++lc)<<endl;
 	}
 
 	cout<<"\nsent file\n";
+	cout<<"sending RCOM\n";
+	int opc = 40;
+	send(fd, &opc, sizeof(opc), 0);
+	cout<<"sent "<<opc<<endl;
 	fclose(fp);
-	cout<<"sending forty\n";
-	send(fd, &forty, sizeof(forty), 0);
-	cout<<"sent forty\n";
 }
 
 void *client_handler(void *ptr)
@@ -302,14 +299,12 @@ int main(int argc, char const *argv[])
 	int opt = 1; 
 	int addrlen = sizeof(address); 
 	char buffer[BUFF_SIZE] = {0}; 	
-	// Creating socket file descriptor 
+	
 	if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) 
 	{ 
 		perror("socket failed"); 
 		exit(EXIT_FAILURE); 
 	} 
-	
-	// Forcefully attaching socket to the port 8080 
 	if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt))) 
 	{ 
 		perror("setsockopt"); 
@@ -319,7 +314,6 @@ int main(int argc, char const *argv[])
 	address.sin_addr.s_addr = INADDR_ANY; 
 	address.sin_port = htons( PORT ); 
 	
-	// Forcefully attaching socket to the port 8080 
 	if (bind(server_fd, (struct sockaddr *)&address, sizeof(address))<0) 
 	{ 
 		perror("bind failed"); 
