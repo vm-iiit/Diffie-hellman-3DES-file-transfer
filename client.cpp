@@ -23,6 +23,37 @@ const bool tval = true, fval = false;
 
 #define PORT 8080
 #define BUFF_SIZE 1024
+const int ten=10, twenty=20, thirty=30, forty=40, fifty=50;
+bool bsync;
+char *K1=NULL, *K2=NULL, *K3=NULL;
+
+struct PubKey{
+	Integer large_prime;
+	Integer primitive_root;
+	Integer pubkey;
+};
+
+void send_Integer(Integer &I, int fd)
+{
+	int bc = I.BitCount();
+	
+	send(fd , &bc , sizeof(bc) , 0);
+	while(bc--)
+	{
+		if(I.GetBit(bc))
+			send(fd, &tval, sizeof(tval), 0);
+		else
+			send(fd, &fval, sizeof(fval), 0);
+	}
+}
+
+void send_Pubkey(struct PubKey spk, int fd)
+{
+	send_Integer(spk.large_prime, fd);
+	send_Integer(spk.primitive_root, fd);
+	send_Integer(spk.pubkey, fd);
+}
+
 
 void DES_Process(char *keyString, byte *block, size_t length, CryptoPP::CipherDir direction)
 { 
@@ -61,20 +92,6 @@ Integer receive_Integer(int fd)
 	return I;
 }
 
-void send_Integer(Integer &I, int fd)
-{
-	int bc = I.BitCount();
-	
-	send(fd , &bc , sizeof(bc) , 0);
-	while(bc--)
-	{
-		if(I.GetBit(bc))
-			send(fd, &tval, sizeof(tval), 0);
-		else
-			send(fd, &fval, sizeof(fval), 0);
-	}
-}
-
 SecByteBlock Int2Block(Integer x)
 {
 	SecByteBlock bytes;
@@ -85,7 +102,7 @@ SecByteBlock Int2Block(Integer x)
 }
 
 
-void DH_auth(int fd)
+void Diffie_Hellman(int fd)
 {
 	AutoSeededRandomPool rnd1;
 	PrimeAndGenerator pg1;
@@ -94,12 +111,11 @@ void DH_auth(int fd)
     Integer q1= pg1.SubPrime();
     Integer g1 = pg1.Generator();
 
-	cout << "P1: " << p1 << '\n';
-	cout << "Q1: " << q1 << '\n';
-	cout << "G1: " << g1 << '\n';
+	cout << "Large prime 1 : " << p1 << '\n';
+	cout << "Primitive root 1 : " << g1 << '\n';
 	send_Integer(p1, fd);
 	send_Integer(g1, fd);
-	DH dhC1 = CryptoPP::DH(p1, q1, g1);
+	DH dhC1 = DH(p1, q1, g1);
 	SecByteBlock privKeyC1, pubKeyC1;
 	privKeyC1 = SecByteBlock(dhC1.PrivateKeyLength());
     pubKeyC1 = SecByteBlock(dhC1.PublicKeyLength());
@@ -107,13 +123,14 @@ void DH_auth(int fd)
 
     Integer pubk1(pubKeyC1, pubKeyC1.size());
     Integer privk1(privKeyC1, privKeyC1.size());
-    cout<<"pubkey "<<pubk1<<endl;
-    cout<<"privkey "<<privk1<<endl;
+    cout<<"pubkey 1 :"<<pubk1<<endl;
+    cout<<"privkey 1 :"<<privk1<<endl;
     send_Integer(pubk1, fd);
 
     Integer pubkeyS1 = receive_Integer(fd);
+    cout<<"received pubkey1 from server "<<pubkeyS1<<endl;
     Integer shared_key1 = ModularExponentiation(pubkeyS1, privk1, p1);
-    cout<<"shared key "<<shared_key1<<endl;
+    cout<<"shared key 1 :"<<shared_key1<<endl<<endl;
 
     SecByteBlock Key1 = Int2Block(shared_key1);
     char enkey1[sizeof(Key1)];
@@ -127,9 +144,8 @@ void DH_auth(int fd)
     Integer q2= pg2.SubPrime();
     Integer g2 = pg2.Generator();
 
-	cout << "P2: " << p2 << '\n';
-	cout << "Q2: " << q2 << '\n';
-	cout << "G2: " << g2 << '\n';
+	cout << "Large prime 2 : " << p2 << '\n';
+	cout << "Primitive root 2 : " << g2 << '\n';
 	send_Integer(p2, fd);
 	send_Integer(g2, fd);
 	DH dhC2 = DH(p2, q2, g2);
@@ -140,13 +156,14 @@ void DH_auth(int fd)
 
     Integer pubk2(pubKeyC2, pubKeyC2.size());
     Integer privk2(privKeyC2, privKeyC2.size());
-    cout<<"pubkey "<<pubk2<<endl;
-    cout<<"privkey "<<privk2<<endl;
+    cout<<"pubkey 2 :"<<pubk2<<endl;
+    cout<<"privkey 2 :"<<privk2<<endl;
     send_Integer(pubk2, fd);
 
     Integer pubkeyS2 = receive_Integer(fd);
+    cout<<"received pubkey2 from server "<<pubkeyS2<<endl;
     Integer shared_key2 = ModularExponentiation(pubkeyS2, privk2, p2);
-    cout<<"shared key "<<shared_key2<<endl;
+    cout<<"shared key 2 :"<<shared_key2<<endl<<endl;
 
     SecByteBlock Key2 = Int2Block(shared_key2);
     char enkey2[sizeof(Key2)];
@@ -160,9 +177,8 @@ void DH_auth(int fd)
     Integer q3= pg3.SubPrime();
     Integer g3 = pg3.Generator();
 
-	cout << "P3  " << p3 << '\n';
-	cout << "Q3: " << q3 << '\n';
-	cout << "G3: " << g3 << '\n';
+	cout << "Large prime 3 :" << p3 << '\n';
+	cout << "Primitive root 3 :" << g3 << '\n';
 	send_Integer(p3, fd);
 	send_Integer(g3, fd);
 	DH dhC3 = CryptoPP::DH(p3, q3, g3);
@@ -173,52 +189,113 @@ void DH_auth(int fd)
 
     Integer pubk3(pubKeyC3, pubKeyC3.size());
     Integer privk3(privKeyC3, privKeyC3.size());
-    cout<<"pubkey "<<pubk3<<endl;
-    cout<<"privkey "<<privk3<<endl;
+    cout<<"pubkey 3 :"<<pubk3<<endl;
+    cout<<"privkey 3 :"<<privk3<<endl;
     send_Integer(pubk3, fd);
 
     Integer pubkeyS3 = receive_Integer(fd);
+    cout<<"received pubkey3 from server "<<pubkeyS3<<endl;
     Integer shared_key3 = ModularExponentiation(pubkeyS3, privk3, p3);
-    cout<<"shared key "<<shared_key3<<endl;
+    cout<<"shared key 3 :"<<shared_key3<<endl<<endl;
 
     SecByteBlock Key3 = Int2Block(shared_key3);
     char enkey3[sizeof(Key3)];
     memcpy(enkey3, Key3, sizeof(Key3));
 
+    K1 = (char*)malloc(sizeof(enkey1));
+    K2 = (char*)malloc(sizeof(enkey2));
+    K3 = (char*)malloc(sizeof(enkey3));
+
+    memcpy(K1, enkey1, sizeof(enkey1));
+    memcpy(K2, enkey2, sizeof(enkey2));
+    memcpy(K3, enkey3, sizeof(enkey3));
+    cout<<"\n3 Keys obtained\n";
+}
+
+void file_download(string filename, int fd)
+{
+	int opc;
+	send(fd, filename.c_str(), BUFF_SIZE, 0);
     byte block[BUFF_SIZE];
     char buffer[BUFF_SIZE];
-	
-    int fsize;
-	string comppath = "video.mkv";
-	
-	FILE *fp = fopen (comppath.c_str(), "wb");
-	ssize_t n;
+
+    while(1)
+    {
+    	cout<<"waiting for ENCMSG from server\n";
+    	recv(fd, &opc, sizeof(opc), 0);
+    	if(opc == 30)
+    		break;
+    	else
+    	{
+    		cout<<"requested file not available with server, try some other filename or enter E to exit\n";
+    		cin.clear();
+    		fflush(stdin);
+    		getline(cin, filename);
+    		remove(filename.c_str());
+    		if(filename == "E")
+    		{
+    			send(fd, &fifty, sizeof(fifty), 0);
+    			cout<<"Exiting\n";
+    			exit(0);
+    		}
+    		send(fd, &twenty, sizeof(twenty), 0);
+    		send(fd, filename.c_str(), BUFF_SIZE, 0);
+    	}
+    }
+
+    cout<<"received ENCMSG from server\n";
+    long long int fsize;
+    ssize_t n;
+	FILE *fp = fopen(filename.c_str(), "wb");
 	recv(fd, &fsize, sizeof(fsize), 0);
-	cout<<"got file size "<<fsize<<endl;
+	cout<<"got file size as "<<fsize<<" bytes"<<endl;
 	memset(block, '\0', sizeof(block));
-	while(( n = recv(fd, block, BUFF_SIZE, 0)) > 0)
+	cout<<"Downlading the requested file from server\n";
+	int lc=0;
+	while(fsize > 0)
 	{	
-		// cout<<"encrypted text :"<<block<<endl;
-		DES_Process(enkey3, block, BUFF_SIZE, CryptoPP::DECRYPTION);
-		DES_Process(enkey2, block, BUFF_SIZE, CryptoPP::ENCRYPTION);
-		DES_Process(enkey1, block, BUFF_SIZE, CryptoPP::DECRYPTION);
-		// cout<<"decrypted text :\n";
-		// cout<<block<<endl;
-		memset(buffer, '\0', BUFF_SIZE);
-		memcpy(buffer, block, BUFF_SIZE);
-		fwrite (buffer, sizeof(char), BUFF_SIZE, fp);
-		memset ( block , '\0', BUFF_SIZE);
-	} 
-	cout<<"file downloaded\n";
-    close(fd);
+		// send(fd, &bsync, sizeof(bsync), 0);
+		recv(fd, &n, sizeof(n), 0);
+		recv(fd, block, n*sizeof(byte), 0);
+					
+			DES_Process(K3, block, BUFF_SIZE, CryptoPP::DECRYPTION);
+			DES_Process(K2, block, BUFF_SIZE, CryptoPP::ENCRYPTION);
+			DES_Process(K1, block, BUFF_SIZE, CryptoPP::DECRYPTION);
+			// cout<<block;
+			memset(buffer, '\0', BUFF_SIZE);
+			memcpy(buffer, block, BUFF_SIZE);
+			fwrite (buffer, sizeof(char), n, fp);
+			memset ( block , '\0', BUFF_SIZE);
+			// cout<<"\nremaining fsize "<<fsize<<endl;
+			fsize -= n;
+			cout<<"loop count "<<(++lc)<<endl;
+	}
+	
+	cout<<"file transfer complete\n";
 	fclose(fp);
+	cout<<"\nsending sync\n";
+	cout<<"\nsent sync\n";
+	recv(fd, &opc, sizeof(opc), 0);
+	cout<<"\nrecived "<<opc<<" from server\n";
+	if(opc == 40)
+	{	
+		cout<<"\ngot REQCOM from server\n";
+		cout<<"file downloaded\n";
+	}
+	else
+	{
+		cout<<"\nfile download unsuccessful, exiting\n";
+		// cout<<"sending DISCONNECT to server\n";
+		// send(fd, &fifty, sizeof(fifty), 0);
+		// close(fd);
+		// exit(0);
+	}
 }
 
 int main(int argc, char const *argv[]) 
 { 
 	int sock = 0, valread; 
 	struct sockaddr_in serv_addr; 
-	char *hello = "Hello from client"; 
 	char buffer[BUFF_SIZE] = {0}; 
 	if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) 
 	{ 
@@ -241,6 +318,32 @@ int main(int argc, char const *argv[])
 		printf("\nConnection Failed \n"); 
 		return -1; 
 	}
-	DH_auth(sock);
+
+	string filename;
+	char ch;
+	cout<<"PUBKEY\nSending Public keys to server \n";
+	send(sock, &ten, sizeof(ten), 0);
+	Diffie_Hellman(sock);
+	while(1)
+	{
+		cin.clear();
+		fflush(stdin);
+		cout<<"\nEnter name of file to be downloaded :";
+		getline(cin, filename);
+		if(remove(filename.c_str()) == 0)
+			cout<<"overwriting existing file\n";
+		cout<<"sending REQSERV to server\n";
+		send(sock, &twenty, sizeof(twenty), 0);
+		file_download(filename, sock);
+		cout<<"Enter C to continue downloading more files, any other key to exit\n";
+		cin.clear();
+		fflush(stdin);
+		cin>>ch;
+		if(ch != 'C' && ch != 'c')
+			break;
+	}
+	cout<<"sending DISCONNECT to server\n";
+	send(sock, &fifty, sizeof(fifty), 0);
+	close(sock);
 	return 0; 
 } 

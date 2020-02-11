@@ -20,9 +20,18 @@
 #include "crypto++/dh2.h"
 using namespace std;
 using namespace CryptoPP;
+
 #define PORT 8080
 #define BUFF_SIZE 1024
 const bool tval = true, fval = false;
+const int ten=10, twenty=20, thirty=30, forty=40, fifty=50, na=0;
+bool bsync;
+
+struct PubKey{
+	Integer large_prime;
+	Integer primitive_root;
+	Integer pubkey;
+};
 
 Integer receive_Integer(int fd)
 {
@@ -37,6 +46,13 @@ Integer receive_Integer(int fd)
 			I += Integer::Power2(in);
 	}
 	return I;
+}
+
+void receive_Pubkey(struct PubKey &spk, int fd)
+{
+	spk.large_prime = receive_Integer(fd);
+	spk.primitive_root = receive_Integer(fd);
+	spk.pubkey = receive_Integer(fd);
 }
 
 void send_Integer(Integer &I, int fd)
@@ -54,7 +70,7 @@ void send_Integer(Integer &I, int fd)
 }
 
 void DES_Process(char *keyString, byte *block, size_t length, CryptoPP::CipherDir direction)
-{ 
+{
     byte key[DES_EDE2::KEYLENGTH];
     memcpy(key, keyString, DES_EDE2::KEYLENGTH);
     BlockTransformation *t = NULL;
@@ -84,18 +100,27 @@ SecByteBlock Int2Block(Integer x)
     return bytes;
 }
 
-void *DH_auth(void *ptr)
+struct enckeys{
+	char K1[BUFF_SIZE];
+	char K2[BUFF_SIZE];
+	char K3[BUFF_SIZE];
+};
+
+typedef struct enckeys Keyset;
+// Keyset Kset;
+
+char **Diffie_Hellman(int fd)
 {
-	AutoSeededRandomPool rnd1;
-	int fd = *(int *)ptr;
-	
+	char **Karr = (char **)malloc(sizeof(char*)*3);
+
+	AutoSeededRandomPool rnd1;	
 	Integer p1 = receive_Integer(fd);
-	cout<<"received der integer p1 "<<p1<<endl;
+	cout<<" received Large prime 1 : " << p1 << '\n';
 
 	Integer g1 = receive_Integer(fd);
-	cout<<"received der integer g1 "<<g1<<endl;
+	cout << "received Primitive root 1 : " << g1 << '\n';
 	Integer pubkC1 = receive_Integer(fd);
-	cout<<"received der pubkey "<<pubkC1<<endl;
+	cout<<"received pubkey1 from client "<<pubkC1<<endl;
 	DH dhS1 = CryptoPP::DH(p1, g1);
 
 	SecByteBlock privKeyS1, pubKeyS1;
@@ -107,27 +132,25 @@ void *DH_auth(void *ptr)
 	Integer privk1(privKeyS1, privKeyS1.size());
 	send_Integer(pubk1, fd);
 
-	cout<<"pubkey "<<pubk1<<endl;
-    cout<<"privkey "<<privk1<<endl;
+	cout<<"pubkey 1 : "<<pubk1<<endl;
+    cout<<"privkey 1 :"<<privk1<<endl;
 
     Integer shared_key1 = ModularExponentiation(pubkC1, privk1, p1);
-    cout<<"shared key "<<shared_key1<<endl;
-
+    cout<<"shared key 1 :"<<shared_key1<<endl<<endl;
 
     SecByteBlock Key1 = Int2Block(shared_key1);
-    char enkey1[sizeof(Key1)];
-    memcpy(enkey1, Key1, sizeof(Key1));
-
+    Karr[0] = (char *)malloc(sizeof(shared_key1));
+    memcpy(Karr[0], Key1, sizeof(Key1));
 
 
     AutoSeededRandomPool rnd2;	
 	Integer p2 = receive_Integer(fd);
-	cout<<"received der integer p2 "<<p2<<endl;
+	cout<<"received Large prime 2 "<<p2<<endl;
 
 	Integer g2 = receive_Integer(fd);
-	cout<<"received der integer g2 "<<g2<<endl;
+	cout<<"received Primitive root 2 "<<g2<<endl;
 	Integer pubkC2 = receive_Integer(fd);
-	cout<<"received der pubkey "<<pubkC2<<endl;
+	cout<<"received pubkey2 from client "<<pubkC2<<endl;
 	DH dhS2 = CryptoPP::DH(p2, g2);
 
 	SecByteBlock privKeyS2, pubKeyS2;
@@ -139,26 +162,25 @@ void *DH_auth(void *ptr)
 	Integer privk2(privKeyS2, privKeyS2.size());
 	send_Integer(pubk2, fd);
 
-	cout<<"pubkey "<<pubk2<<endl;
-    cout<<"privkey "<<privk2<<endl;
+	cout<<"pubkey 2 : "<<pubk2<<endl;
+    cout<<"privkey 2 : "<<privk2<<endl;
 
     Integer shared_key2 = ModularExponentiation(pubkC2, privk2, p2);
-    cout<<"shared key "<<shared_key2<<endl;
+    cout<<"shared key 2 :"<<shared_key2<<endl<<endl;
 
 
     SecByteBlock Key2 = Int2Block(shared_key2);
-    char enkey2[sizeof(Key2)];
-    memcpy(enkey2, Key2, sizeof(Key2));
-
+    Karr[1] = (char *)malloc(sizeof(shared_key2));
+    memcpy(Karr[1], Key2, sizeof(Key2));
 
     AutoSeededRandomPool rnd3;	
 	Integer p3 = receive_Integer(fd);
-	cout<<"received der integer p3 "<<p3<<endl;
+	cout<<"received Large prime 3 "<<p3<<endl;
 
 	Integer g3 = receive_Integer(fd);
-	cout<<"received der integer g3 "<<g3<<endl;
+	cout<<"received Primitive root 3 "<<g3<<endl;
 	Integer pubkC3 = receive_Integer(fd);
-	cout<<"received der pubkey "<<pubkC3<<endl;
+	cout<<"received pubkey3 from client "<<pubkC3<<endl;
 	DH dhS3 = CryptoPP::DH(p3, g3);
 
 	SecByteBlock privKeyS3, pubKeyS3;
@@ -170,51 +192,107 @@ void *DH_auth(void *ptr)
 	Integer privk3(privKeyS3, privKeyS3.size());
 	send_Integer(pubk3, fd);
 
-	cout<<"pubkey "<<pubk3<<endl;
-    cout<<"privkey "<<privk3<<endl;
+	cout<<"pubkey 3 : "<<pubk3<<endl;
+    cout<<"privkey 3 : "<<privk3<<endl;
 
     Integer shared_key3 = ModularExponentiation(pubkC3, privk3, p3);
-    cout<<"shared key "<<shared_key3<<endl;
+    cout<<"shared key 3 : "<<shared_key3<<endl<<endl;
 
 
     SecByteBlock Key3 = Int2Block(shared_key3);
-    char enkey3[sizeof(Key3)];
-    memcpy(enkey3, Key3, sizeof(Key3));
+    Karr[2] = (char *)malloc(sizeof(shared_key3));
+    memcpy(Karr[2], Key3, sizeof(Key3));
+    cout<<"\n3 Keys obtained\n";
+    return Karr;
+}
 
-    char buffer[BUFF_SIZE] = "ricknmorty.mkv";
+void send_file(char *filename, int fd, char **Karr)
+{
+	
+    char buffer[BUFF_SIZE];
     byte block[BUFF_SIZE] ;
+    cout<<"\nbuffer addressis "<<&buffer<<endl;
     
-
-    FILE *fp = fopen ( buffer, "rb" );
-	if(fp==NULL)
-	{
-		cout<<"cant open file\n";
-		pthread_exit(NULL);
-	}
+    FILE *fp = fopen(filename, "rb");
 	fseek(fp, 0, SEEK_END);
-	int size = ftell(fp);                       //calculate filesize
+	long long int size = ftell(fp);
+	ssize_t n;
 	rewind(fp);
 	cout<<"size of file is "<<size<<endl;
-	send(fd, &size, sizeof(size), 0);        //textll the size to other peer
-	cout<<"sent filesize "<<size<<endl;
-	ssize_t n;
+	send(fd, &size, sizeof(size), 0);        
+	cout<<"sent filesize "<<size<<" to fd# "<<fd<<endl;
 	memset(block, '\0', BUFF_SIZE);
-	// memset(buffer, '\0', sizeof(buffer));
-	while ((n=fread( block , sizeof(char) , BUFF_SIZE, fp ) ) > 0)
-	{
-	    DES_Process(enkey1, block, n, CryptoPP::ENCRYPTION);
-	    DES_Process(enkey2, block, BUFF_SIZE, CryptoPP::DECRYPTION);
-	    DES_Process(enkey3, block, BUFF_SIZE, CryptoPP::ENCRYPTION);
-		send(fd, block, BUFF_SIZE, 0);
-		// cout<<"decrypted text :"<<block<<endl;
-   	 	// memset ( buffer , '\0', BUFF_SIZE);
+	int lc=0;
+	while (size > 0)
+	{	
+		// recv(fd, &bsync, sizeof(bsync), 0);
+		n=fread( block , sizeof(char) , BUFF_SIZE, fp );
+		send(fd, &n, sizeof(n), 0);
+	    DES_Process(Karr[0], block, n, CryptoPP::ENCRYPTION);
+	    DES_Process(Karr[1], block, BUFF_SIZE, CryptoPP::DECRYPTION);
+	    DES_Process(Karr[2], block, BUFF_SIZE, CryptoPP::ENCRYPTION);
+		send(fd, block, BUFF_SIZE*sizeof(byte), 0);
    	 	memset(block, '\0', BUFF_SIZE);
+   	 	size -= n;
+   	 	cout<<"loop count "<<(++lc)<<endl;
 	}
 
-	cout<<"sent file\n";
-	close(fd);
+	cout<<"\nsent file\n";
 	fclose(fp);
-	pthread_exit(NULL);
+	cout<<"sending forty\n";
+	send(fd, &forty, sizeof(forty), 0);
+	cout<<"sent forty\n";
+}
+
+void *client_handler(void *ptr)
+{
+	int fd = *(int *)ptr;
+	int opc;
+	char filename[BUFF_SIZE];
+	char **Karr;
+	while(1)
+	{
+		recv(fd, &opc, sizeof(opc), 0);
+		cout<<"\nreceived opcode "<<opc<<" from client\n";
+		switch(opc)
+		{
+			case 10:cout<<"PUBKEY from client\n";
+					Karr = Diffie_Hellman(fd);
+					break;
+			case 20:{
+						cout<<"REQSERV from client\n";
+						memset(filename, '\0', BUFF_SIZE);
+						recv(fd, filename, BUFF_SIZE, 0);
+						FILE *fp = fopen(filename, "rb");
+						if(fp==NULL)
+						{
+							cout<<"requested "<<filename<<" file not found on server's directory\n";
+							send(fd, &na, sizeof(na), 0);
+						}
+						else
+						{
+							cout<<"Uploading file to client\n";
+							cout<<"\nsending ENCMSG to client\n";
+							send(fd, &thirty, sizeof(thirty), 0);
+							fclose(fp);
+							send_file(filename, fd, Karr);
+							cout<<"\nclient request served\n";
+						}
+					}
+					break;
+			case 50:cout<<"DISCONNECT from client\n";
+					free(Karr[0]);
+					free(Karr[1]);
+					free(Karr[2]);
+					free(Karr);
+					close(fd);
+					pthread_exit(NULL);
+					break;
+			default:cout<<"Unidentifiable message from client\n";
+					break;
+		}
+	}
+
 }
 
 int main(int argc, char const *argv[]) 
@@ -223,9 +301,7 @@ int main(int argc, char const *argv[])
 	struct sockaddr_in address; 
 	int opt = 1; 
 	int addrlen = sizeof(address); 
-	char buffer[BUFF_SIZE] = {0}; 
-	char *hello = "Hello from server"; 
-	
+	char buffer[BUFF_SIZE] = {0}; 	
 	// Creating socket file descriptor 
 	if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) 
 	{ 
@@ -234,8 +310,7 @@ int main(int argc, char const *argv[])
 	} 
 	
 	// Forcefully attaching socket to the port 8080 
-	if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, 
-												&opt, sizeof(opt))) 
+	if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt))) 
 	{ 
 		perror("setsockopt"); 
 		exit(EXIT_FAILURE); 
@@ -245,8 +320,7 @@ int main(int argc, char const *argv[])
 	address.sin_port = htons( PORT ); 
 	
 	// Forcefully attaching socket to the port 8080 
-	if (bind(server_fd, (struct sockaddr *)&address, 
-								sizeof(address))<0) 
+	if (bind(server_fd, (struct sockaddr *)&address, sizeof(address))<0) 
 	{ 
 		perror("bind failed"); 
 		exit(EXIT_FAILURE); 
@@ -258,7 +332,7 @@ int main(int argc, char const *argv[])
 	} 
 	
 	pthread_t threads[50];
-	int counter=0;
+	int count=0;
 	while(1)
 	{
 		int new_socket;
@@ -268,7 +342,7 @@ int main(int argc, char const *argv[])
 			perror("accept"); 
 			exit(EXIT_FAILURE); 
 		}
-		
-		pthread_create(&threads[counter++], NULL, DH_auth, (void *)&new_socket);
+		cout<<"New client connected\n";
+		pthread_create(&threads[count++], NULL, client_handler, (void *)&new_socket);
 	}
 } 
